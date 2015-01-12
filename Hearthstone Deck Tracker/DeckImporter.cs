@@ -39,6 +39,8 @@ namespace Hearthstone_Deck_Tracker
 				return await ImportArenaValue(url);
 			if(url.Contains("hearthstone-decks"))
 				return await ImportHearthstoneDecks(url);
+            if (url.Contains("heartharena"))
+                return await ImportHearthArena(url);
 			Logger.WriteLine("invalid url", "DeckImporter");
 			return null;
 		}
@@ -176,6 +178,55 @@ namespace Hearthstone_Deck_Tracker
 				return null;
 			}
 		}
+
+        private static async Task<Deck> ImportHearthArena(string url)
+        {
+            try
+            {
+                var deck = new Deck { Name = "Arena " + DateTime.Now.ToString("dd-MM hh:mm") };
+
+                var doc = await GetHtmlDoc(url);
+                var deckList = doc.DocumentNode.SelectSingleNode("//ul[@class='deckList']");
+
+                //var cardNodes = doc.DocumentNode.SelectNodes("//ul[@class='deckList']//li[@class='deckCard '] | //ul[@class='deckList']//li[@class='deckCard  multiple']");
+
+                var cardNodes = doc.DocumentNode.SelectNodes("//ul[@class='deckList']//li[@data-card-image]");
+
+                if (cardNodes == null)
+                    return null;
+
+                foreach (var cardNode in cardNodes)
+                {
+                    var id = cardNode.Attributes["data-card-image"].Value.ToString().Split('/').Last().Split('.').First();
+
+                    var name = HttpUtility.HtmlDecode(cardNode.Attributes["data-name"].Value); ;
+                    var card = Game.GetCardFromName(name);
+                    card.Count = 1;
+
+                    var quantity = cardNode.SelectSingleNode(".//span[@class='quantity']");
+                    if(quantity != null)
+                    {
+                        int count = 1;
+                        int.TryParse(quantity.InnerText, out count);
+
+                        card.Count = count;
+                    }
+                                        
+                    deck.Cards.Add(card);
+
+                    if (string.IsNullOrEmpty(deck.Class) && card.GetPlayerClass != "Neutral")
+                        deck.Class = card.PlayerClass;
+                }
+
+                return deck;
+            }
+            catch (Exception e)
+            {
+                Logger.WriteLine(e.Message + "\n" + e.StackTrace);
+                return null;
+            }
+        }
+
 
 
 		private static async Task<Deck> ImportHearthNewsFr(string url)
